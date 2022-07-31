@@ -1,45 +1,38 @@
-import pymysql
-import csv
-import sys
+from airflow import DAG
+from airflow.operators.dummy import DummyOperator
+from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
+from airflow.utils.dates import days_ago
 
-print('satu '+sys.argv[1])
-print('nol '+sys.argv[0])
-conn = pymysql.connect(host='host.docker.internal',
-                           port=3307,
-                           user='admin', 
-                           password='admin',  
-                           db='northwind')
-    #run mysql query
-cur = conn.cursor()
+from datetime import datetime, timedelta
 
+with DAG('insert_thasha',
+    schedule_interval="@once",
+    start_date=datetime(2022, 7, 6)       
+) as dag:
 
-sql = """select * from northwind.orders o where cast(order_date as date) = '"""+sys.argv[1]+"""'"""
-csv_file_path = '/opt/airflow/dags/output/thasha/orders/orders_'+sys.argv[1]+'.csv'
+    start = DummyOperator(
+        task_id='start'
+    )    
+      
+    ingest_orders = BashOperator(
+        task_id='ingest_orders',
+        bash_command="""python3 /opt/airflow/dags/ingest/thasha/ingest_orders.py {{ execution_date.format('YYYY-MM-DD') }}"""
+    )
+    
+    to_datalake_orders = BashOperator(
+        task_id='to_datalake_orders',
+        bash_command="""/root/google-cloud-sdk/bin/gsutil cp /opt/airflow/dags/output/thasha/orders/orders_{{ execution_date.format('YYYY-MM-DD') }}.csv gs://digitalskola-de-batch7/thasha/staging/orders/"""
+    )
 
-try:
-    cur.execute(sql)
-    rows = cur.fetchall()
-finally:
-    conn.close()
+    data_definition_orders = BashOperator(
+        task_id='data_definition_orders',
+        bash_command="""/root/google-cloud-sdk/bin/bq mkdef --autodetect --source_format=CSV gs://digitalskola-de-batch7/thasha/staging/orders/* > /opt/airflow/dags/table_def/thasha/orders.def"""
+    )
 
-# Continue only if there are rows returned.
-if rows:
-    # New empty list called 'result'. This will be written to a file.
-    result = list()
+    to_dwh_orders = BashOperator(
+        task_id='to_dwh_orders',
+        bash_command="""/root/google-cloud-sdk/bin/bq mk --external_table_definition=/opt/airflow/dags/table_def/thasha/orders.def de_7.thasha_orders"""
+    )
 
-    # The row name is the first entry for each entity in the description tuple.
-    column_names = list()
-    for i in cur.description:
-        column_names.append(i[0])
-
-    result.append(column_names)
-    for row in rows:
-        result.append(row)
-
-    # Write result to file.
-    with open(csv_file_path, 'w', newline='') as csvfile:
-        csvwriter = csv.writer(csvfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        for row in result:
-            csvwriter.writerow(row)
-else:
-    print("No rows found for query: {}".format(sql))
+    start >> ingest_orders >> to_datalake_orders >> data_definition_orders >> to_dwh_orders
