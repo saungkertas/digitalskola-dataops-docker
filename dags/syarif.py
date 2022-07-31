@@ -36,3 +36,4 @@ with DAG('insert_syarif',
     )
 
     start >> ingest_orders >> to_datalake_orders >> data_definition_orders >> to_dwh_orders
+    
