@@ -43,3 +43,4 @@ if rows:
             csvwriter.writerow(row)
 else:
     print("No rows found for query: {}".format(sql))
+    
