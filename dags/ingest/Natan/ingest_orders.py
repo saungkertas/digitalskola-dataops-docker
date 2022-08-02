@@ -14,7 +14,7 @@ cur = conn.cursor()
 
 
 sql = """select * from northwind.orders o where cast(order_date as date) = '"""+sys.argv[1]+"""'"""
-csv_file_path = '/opt/airflow/dags/output/natan/orders/orders_'+sys.argv[1]+'.csv'
+csv_file_path = '/opt/airflow/dags/output/Natan/orders/orders_'+sys.argv[1]+'.csv'
 
 try:
     cur.execute(sql)
@@ -43,4 +43,3 @@ if rows:
             csvwriter.writerow(row)
 else:
     print("No rows found for query: {}".format(sql))
-    

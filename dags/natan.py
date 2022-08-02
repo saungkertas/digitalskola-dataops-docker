@@ -6,7 +6,7 @@ from airflow.utils.dates import days_ago
 
 from datetime import datetime, timedelta
 
-with DAG('insert_natan',
+with DAG('insert_Natan',
     schedule_interval="@once",
     start_date=datetime(2022, 7, 6)       
 ) as dag:
@@ -17,22 +17,22 @@ with DAG('insert_natan',
       
     ingest_orders = BashOperator(
         task_id='ingest_orders',
-        bash_command="""python3 /opt/airflow/dags/ingest/natan/ingest_orders.py {{ execution_date.format('YYYY-MM-DD') }}"""
+        bash_command="""python3 /opt/airflow/dags/ingest/Natan/ingest_orders.py {{ execution_date.format('YYYY-MM-DD') }}"""
     )
     
     to_datalake_orders = BashOperator(
         task_id='to_datalake_orders',
-        bash_command="""/root/google-cloud-sdk/bin/gsutil cp /opt/airflow/dags/output/natan/orders/orders_{{ execution_date.format('YYYY-MM-DD') }}.csv gs://digitalskola-de-batch7/natan/staging/orders/"""
+        bash_command="""/root/google-cloud-sdk/bin/gsutil cp /opt/airflow/dags/output/Natan/orders/orders_{{ execution_date.format('YYYY-MM-DD') }}.csv gs://digitalskola-de-batch7/Natan/staging/orders/"""
     )
 
     data_definition_orders = BashOperator(
         task_id='data_definition_orders',
-        bash_command="""/root/google-cloud-sdk/bin/bq mkdef --autodetect --source_format=CSV gs://digitalskola-de-batch7/natan/staging/orders/* > /opt/airflow/dags/table_def/natan/orders.def"""
+        bash_command="""/root/google-cloud-sdk/bin/bq mkdef --autodetect --source_format=CSV gs://digitalskola-de-batch7/Natan/staging/orders/* > /opt/airflow/dags/table_def/Natan/orders.def"""
     )
 
     to_dwh_orders = BashOperator(
         task_id='to_dwh_orders',
-        bash_command="""/root/google-cloud-sdk/bin/bq mk --external_table_definition=/opt/airflow/dags/table_def/natan/orders.def de_7.natan_orders"""
+        bash_command="""/root/google-cloud-sdk/bin/bq mk --external_table_definition=/opt/airflow/dags/table_def/Natan/orders.def de_7.Natan_orders"""
     )
 
     start >> ingest_orders >> to_datalake_orders >> data_definition_orders >> to_dwh_orders
