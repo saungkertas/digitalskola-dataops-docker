@@ -1,4 +1,4 @@
-rom airflow import DAG
+from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
@@ -6,22 +6,33 @@ from airflow.utils.dates import days_ago
 
 from datetime import datetime, timedelta
 
-with DAG('syarif',
-    start_date=datetime(2022, 7, 26)       
+with DAG('insert_salma',
+    schedule_interval="@once",
+    start_date=datetime(2022, 7, 6)       
 ) as dag:
 
     start = DummyOperator(
         task_id='start'
     )    
       
-    create_tb_mysql = BashOperator(
-        task_id='create_tb_mysql',
-        bash_command=f"""python3 /opt/airflow/salma/create/create_mysql_tb.py"""
+    ingest_orders = BashOperator(
+        task_id='ingest_orders',
+        bash_command="""python3 /opt/airflow/dags/ingest/salma/ingest_orders.py {{ execution_date.format('YYYY-MM-DD') }}"""
+    )
+    
+    to_datalake_orders = BashOperator(
+        task_id='to_datalake_orders',
+        bash_command="""/root/google-cloud-sdk/bin/gsutil cp /opt/airflow/dags/output/salma/orders/orders_{{ execution_date.format('YYYY-MM-DD') }}.csv gs://digitalskola-de-batch7/salma/staging/orders/"""
     )
 
-    load_case = BashOperator(
-        task_id='load_case',
-        bash_command=f"""python3 /opt/airflow/salma/load/insert_mysql_tb.py"""
+    data_definition_orders = BashOperator(
+        task_id='data_definition_orders',
+        bash_command="""/root/google-cloud-sdk/bin/bq mkdef --autodetect --source_format=CSV gs://digitalskola-de-batch7/salma/staging/orders/* > /opt/airflow/dags/table_def/salma/orders.def"""
     )
 
-    start >> create_tb_mysql >> load_case
+    to_dwh_orders = BashOperator(
+        task_id='to_dwh_orders',
+        bash_command="""/root/google-cloud-sdk/bin/bq mk --external_table_definition=/opt/airflow/dags/table_def/salma/orders.def de_7.salma_orders"""
+    )
+
+    start >> ingest_orders >> to_datalake_orders >> data_definition_orders >> to_dwh_orders
